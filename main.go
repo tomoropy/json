@@ -9,16 +9,10 @@ import (
 	"os"
 
 	_ "github.com/lib/pq"
-	"github.com/k0kubun/pp/v3"
 )
 
 type Log struct {
 	User User `json:"user"`
-	// Dist  string `json:"dist"`
-	// Level string `json:"info"`
-	// Msg   string `json:"msg"`
-	// Src   string `json:"src"`
-	// Time  string `json:"time"`
 }
 
 type Logs []Log
@@ -28,8 +22,6 @@ type User struct {
 	Name string `json:"name"`
 	Role string `json:"role"`
 }
-
-// type Users []User
 
 func main() {
 
@@ -44,12 +36,6 @@ func main() {
 
 	if err := json.Unmarshal(file, &logs); err != nil {
 		log.Fatalln(err)
-	}
-
-	for _, p := range logs {
-		pp.Println(p.User.Age)
-		pp.Println(p.User.Name)
-		pp.Println(p.User.Role)
 	}
 
 	// conection to postgres
@@ -72,14 +58,16 @@ func main() {
 	}
 
 	// insert data
+	// transction process
+	tx, _ := db.Begin()
 	for _, p := range logs {
 
 		cmd := `INSERT INTO user_table (
 			age,
 			name,
-			role) VALUES (?,?,?)`
+			role) VALUES ($1,$2,$3);`
 
-		_, err = db.Exec(cmd,
+		_, err = tx.Exec(cmd,
 			p.User.Age,
 			p.User.Name,
 			p.User.Role,
@@ -88,5 +76,11 @@ func main() {
 		if err != nil {
 			fmt.Println(err)
 		}
+	}
+	// when errors occur
+	if err != nil {
+		tx.Rollback()
+	} else {
+		tx.Commit()
 	}
 }
