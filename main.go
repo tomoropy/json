@@ -25,7 +25,13 @@ type User struct {
 
 func main() {
 
-	file, err := ioutil.ReadFile("./sample.log")
+	fullPath := "./" + os.Args[1]
+	if len(os.Args) > 2 {
+		fmt.Println("引数に渡すファイルは一つだけにしてください")
+		os.Exit(1)
+	}
+
+	file, err := ioutil.ReadFile(fullPath)
 
 	if err != nil {
 		log.Println("ReadError: ", err)
