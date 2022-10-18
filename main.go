@@ -1,11 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
 	"encoding/json"
+
 	"fmt"
-	"io/ioutil"
-	"log"
 	"os"
 
 	_ "github.com/lib/pq"
@@ -24,26 +24,6 @@ type User struct {
 }
 
 func main() {
-
-	fullPath := "./" + os.Args[1]
-	if len(os.Args) > 2 {
-		fmt.Println("引数に渡すファイルは一つだけにしてください")
-		os.Exit(1)
-	}
-
-	file, err := ioutil.ReadFile(fullPath)
-
-	if err != nil {
-		log.Println("ReadError: ", err)
-		os.Exit(1)
-	}
-
-	var logs Logs
-
-	if err := json.Unmarshal(file, &logs); err != nil {
-		log.Fatalln(err)
-	}
-
 	// conection to postgres
 	db, err := sql.Open("postgres", "host=127.0.0.1 port=5433 user=postgres password=postgres sslmode=disable")
 	defer db.Close()
@@ -63,10 +43,29 @@ func main() {
 		fmt.Println(err)
 	}
 
-	// insert data
-	// transction process
-	tx, _ := db.Begin()
-	for _, p := range logs {
+	fullPath := "./" + os.Args[1]
+	if len(os.Args) > 2 {
+		fmt.Println("引数に渡すファイルは一つだけにしてください")
+		os.Exit(1)
+	}
+
+	fp, err := os.Open(fullPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	defer fp.Close()
+
+	scanner := bufio.NewScanner(fp)
+
+	tx, err := db.Begin()
+
+	for scanner.Scan() {
+		var log Log
+
+		if err := json.Unmarshal(scanner.Bytes(), &log); err != nil {
+			fmt.Println(err)
+		}
 
 		cmd := `INSERT INTO user_table (
 			age,
@@ -74,19 +73,18 @@ func main() {
 			role) VALUES ($1,$2,$3);`
 
 		_, err = tx.Exec(cmd,
-			p.User.Age,
-			p.User.Name,
-			p.User.Role,
+			log.User.Age,
+			log.User.Name,
+			log.User.Role,
 		)
 
+		// when errors occur somewhere
 		if err != nil {
 			fmt.Println(err)
+			tx.Rollback() // rollback
+			os.Exit(1)    // exit code
 		}
 	}
-	// when errors occur
-	if err != nil {
-		tx.Rollback()
-	} else {
-		tx.Commit()
-	}
+	// when error doesn't occur
+	tx.Commit()
 }
