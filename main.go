@@ -4,18 +4,18 @@ import (
 	"bufio"
 	"database/sql"
 	"encoding/json"
-
 	"fmt"
+	"log"
 	"os"
 
 	_ "github.com/lib/pq"
 )
 
-type Log struct {
+type Data struct {
 	User User `json:"user"`
 }
 
-type Logs []Log
+type DataLog []Data
 
 type User struct {
 	Age  int    `json:"age"`
@@ -29,7 +29,7 @@ func main() {
 	defer db.Close()
 
 	if err != nil {
-		fmt.Println(err)
+		log.Fatalln(err)
 	}
 
 	// create table
@@ -40,18 +40,18 @@ func main() {
 		name VARCHAR(500), 
 		role CHAR(15)
 		);`); err != nil {
-		fmt.Println(err)
+		log.Fatalln(err)
 	}
 
 	fullPath := "./" + os.Args[1]
 	if len(os.Args) > 2 {
-		fmt.Println("引数に渡すファイルは一つだけにしてください")
+		fmt.Println("引数に渡すファイルは一つにしてください")
 		os.Exit(1)
 	}
 
 	fp, err := os.Open(fullPath)
 	if err != nil {
-		fmt.Println(err)
+		log.Fatalln(err)
 	}
 
 	defer fp.Close()
@@ -59,12 +59,16 @@ func main() {
 	scanner := bufio.NewScanner(fp)
 
 	tx, err := db.Begin()
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	for scanner.Scan() {
-		var log Log
+		var data Data
 
-		if err := json.Unmarshal(scanner.Bytes(), &log); err != nil {
-			fmt.Println(err)
+		if err := json.Unmarshal(scanner.Bytes(), &data); err != nil {
+			log.Fatalln(err)
+			continue
 		}
 
 		cmd := `INSERT INTO user_table (
@@ -73,18 +77,21 @@ func main() {
 			role) VALUES ($1,$2,$3);`
 
 		_, err = tx.Exec(cmd,
-			log.User.Age,
-			log.User.Name,
-			log.User.Role,
+			data.User.Age,
+			data.User.Name,
+			data.User.Role,
 		)
 
 		// when errors occur somewhere
 		if err != nil {
-			fmt.Println(err)
-			tx.Rollback() // rollback
-			os.Exit(1)    // exit code
+			if err = tx.Rollback(); err != nil {
+				fmt.Println(err)
+			}
+			os.Exit(1)
 		}
 	}
 	// when error doesn't occur
-	tx.Commit()
+	if err = tx.Commit(); err != nil {
+		log.Fatalln(err)
+	}
 }
