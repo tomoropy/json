@@ -43,13 +43,12 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	fullPath := "./" + os.Args[1]
 	if len(os.Args) > 2 {
 		fmt.Println("引数に渡すファイルは一つにしてください")
 		os.Exit(1)
 	}
 
-	fp, err := os.Open(fullPath)
+	fp, err := os.Open(os.Args[1])
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -63,6 +62,11 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	cmd := `INSERT INTO user_table (
+		age,
+		name,
+		role) VALUES ($1,$2,$3);`
+
 	for scanner.Scan() {
 		var data Data
 
@@ -70,11 +74,6 @@ func main() {
 			log.Fatalln(err)
 			continue
 		}
-
-		cmd := `INSERT INTO user_table (
-			age,
-			name,
-			role) VALUES ($1,$2,$3);`
 
 		_, err = tx.Exec(cmd,
 			data.User.Age,
